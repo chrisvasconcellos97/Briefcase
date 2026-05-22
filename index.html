@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Briefcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0A1410;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 55% 60% at 18% 50%, rgba(78,204,163,0.05) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 55% at 50% 50%, rgba(200,136,58,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 60% at 82% 50%, rgba(59,130,246,0.04) 0%, transparent 65%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wordmark {
+      position: fixed;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      letter-spacing: 0.34em;
+      color: #243830;
+      text-transform: uppercase;
+      z-index: 10;
+    }
+
+    .suite {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      padding: 0 16px;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding: 36px 44px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .app:hover { transform: translateY(-12px); }
+    .app.soon  { opacity: 0.32; cursor: default; pointer-events: none; }
+
+    .app .icon svg {
+      transition: filter 0.3s ease;
+      filter: drop-shadow(0 0 5px var(--c)) drop-shadow(0 0 2px var(--c));
+    }
+    .app:hover .icon svg {
+      filter:
+        drop-shadow(0 0 10px var(--c))
+        drop-shadow(0 0 24px var(--c))
+        drop-shadow(0 0 48px var(--c));
+    }
+
+    .app-name {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #D0CCC6;
+      transition: color 0.25s ease;
+    }
+    .app:hover .app-name { color: #F0EDE8; }
+
+    .app-desc {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      color: var(--c);
+      text-align: center;
+      line-height: 1.6;
+      opacity: 0.75;
+      transition: opacity 0.25s ease;
+    }
+    .app:hover .app-desc { opacity: 1; }
+
+    .soon-tag {
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      color: #1E3028;
+      text-transform: uppercase;
+      border: 1px solid #182820;
+      border-radius: 20px;
+      padding: 3px 12px;
+      margin-top: -4px;
+    }
+
+    /* ── SYNC connector ── */
+    .sync {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      padding-bottom: 72px;
+    }
+    .sync-line {
+      width: 1px;
+      flex: 1;
+      min-height: 44px;
+      background: linear-gradient(to bottom, transparent, #182E22 40%, #182E22 60%, transparent);
+    }
+    .sync-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 0;
+    }
+    .sync-ring {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 1px solid #1E3028;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sync-pip { width: 4px; height: 4px; border-radius: 50%; background: #243C30; }
+    .sync-label { font-size: 7px; letter-spacing: 0.22em; color: #1E3028; text-transform: uppercase; }
+
+    /* ── Tagline ── */
+    .tagline {
+      position: fixed;
+      bottom: 34px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #1C3028;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    /* ── Floating Pip orb ── */
+    .pip-sonar { position: relative; }
+    .pip-sonar::before, .pip-sonar::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: 1px solid rgba(var(--pr, 200,136,58), 0.35);
+      transform: translate(-50%,-50%) scale(1);
+      animation: sonarRing 3s ease-out infinite;
+      pointer-events: none;
+      z-index: -1;
+    }
+    .pip-sonar::after { animation-delay: 1.5s; }
+    @keyframes sonarRing {
+      0%   { transform: translate(-50%,-50%) scale(1);   opacity: 0.6; }
+      100% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; }
+    }
+    .pip-pulse { animation: pipPulse 2s ease-in-out infinite; }
+    @keyframes pipPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.7; transform: scale(0.92); }
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 700px) {
+      body { justify-content: flex-start; padding: 100px 0 110px; }
+      .suite { flex-direction: column; gap: 0; }
+      .app { padding: 24px 40px; gap: 12px; }
+      .app:hover { transform: none; }
+      .sync { flex-direction: row; padding-bottom: 0; padding-right: 80px; height: 40px; }
+      .sync-line {
+        width: auto; height: 1px; flex: 1; min-height: unset; min-width: 28px;
+        background: linear-gradient(to right, transparent, #182E22 40%, #182E22 60%, transparent);
+      }
+      .sync-label { display: none; }
+      .app-name { font-size: 11px; }
+      .app-desc  { font-size: 10px; }
+    }
+    @media (max-width: 380px) { .app { padding: 20px 28px; } }
+  </style>
+</head>
+<body>
+
+  <div class="wordmark">Briefcase</div>
+
+  <div class="suite">
+
+    <!-- ══════════ LANYARD ══════════ -->
+    <a id="app-lanyard" class="app"
+       href="https://lanyard-hajk.vercel.app"
+       target="_blank" rel="noopener noreferrer"
+       style="--c: #4ECCA3">
+      <div class="icon">
+        <svg width="100" height="100" viewBox="0 0 80 80" fill="none">
+          <!-- Strings -->
+          <path d="M40 7 Q34 13 30 22" stroke="#4ECCA3" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M40 7 Q46 13 50 22" stroke="#4ECCA3" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <!-- Badge body — thin portrait -->
+          <rect x="25" y="22" width="30" height="52" rx="7" fill="#0D1A16" stroke="#4ECCA3" stroke-width="1.5"/>
+          <!-- Clip hole -->
+          <circle cx="40" cy="22" r="3" fill="#0A1410" stroke="#4ECCA3" stroke-width="1.5"/>
+          <!-- Orb — green -->
+          <circle cx="40" cy="50" r="11" fill="rgba(78,204,163,0.12)" stroke="rgba(78,204,163,0.4)" stroke-width="1"/>
+          <circle cx="40" cy="50" r="11" fill="none" stroke="rgba(78,204,163,0.4)" stroke-width="0.8">
+            <animate attributeName="r" from="11" to="21" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" from="0.6" to="0" dur="3s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="40" cy="50" r="11" fill="none" stroke="rgba(78,204,163,0.4)" stroke-width="0.8">
+            <animate attributeName="r" from="11" to="21" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" from="0.6" to="0" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+          </circle>
+          <!-- PipMark — green -->
+          <circle cx="40" cy="47" r="4" fill="#4ECCA3">
+            <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="40" cy="55" r="2.8" fill="#4ECCA3" fill-opacity="0.42"/>
+        </svg>
+      </div>
+      <div class="app-name">Lanyard</div>
+      <div class="app-desc">Conference<br>Intelligence</div>
+    </a>
+
+    <div class="sync">
+      <div class="sync-line"></div>
+      <div class="sync-node">
+        <div class="sync-ring"><div class="sync-pip"></div></div>
+        <div class="sync-label">Sync</div>
+      </div>
+      <div class="sync-line"></div>
+    </div>
+
+    <!-- ══════════ FOLIO ══════════ -->
+    <a id="app-folio" class="app"
+       href="https://folio-psi-wheat.vercel.app"
+       target="_blank" rel="noopener noreferrer"
+       style="--c: #C8883A">
+      <div class="icon">
+        <svg width="100" height="100" viewBox="0 0 80 80" fill="none">
+          <!-- Folder body -->
+          <rect x="6" y="26" width="68" height="44" rx="10" fill="#1C1810" stroke="#C8883A" stroke-width="1.5"/>
+          <!-- Folder tab -->
+          <path d="M6 26 L6 22 Q6 16 12 16 L30 16 Q36 16 38 22 L40 26Z" fill="#1C1810" stroke="#C8883A" stroke-width="1.5"/>
+          <!-- Orb — amber -->
+          <circle cx="40" cy="48" r="13" fill="rgba(200,136,58,0.12)" stroke="rgba(200,136,58,0.4)" stroke-width="1"/>
+          <circle cx="40" cy="48" r="13" fill="none" stroke="rgba(200,136,58,0.4)" stroke-width="0.8">
+            <animate attributeName="r" from="13" to="25" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" from="0.6" to="0" dur="3s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="40" cy="48" r="13" fill="none" stroke="rgba(200,136,58,0.4)" stroke-width="0.8">
+            <animate attributeName="r" from="13" to="25" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" from="0.6" to="0" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+          </circle>
+          <!-- PipMark — amber -->
+          <circle cx="40" cy="45" r="4" fill="#C8883A">
+            <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="40" cy="53" r="2.8" fill="#C8883A" fill-opacity="0.42"/>
+        </svg>
+      </div>
+      <div class="app-name">Folio</div>
+      <div class="app-desc">Account<br>Management</div>
+    </a>
+
+    <div class="sync">
+      <div class="sync-line"></div>
+      <div class="sync-node">
+        <div class="sync-ring"><div class="sync-pip"></div></div>
+        <div class="sync-label">Sync</div>
+      </div>
+      <div class="sync-line"></div>
+    </div>
+
+    <!-- ══════════ GAUGE ══════════ -->
+    <div id="app-gauge" class="app soon" style="--c: #3B82F6">
+      <div class="icon">
+        <svg width="100" height="100" viewBox="0 0 80 80" fill="none">
+          <!-- Speedometer arc -->
+          <path d="M12 57 A30 30 0 1 1 68 57" stroke="#3B82F6" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M18 57 A24 24 0 1 1 62 57" stroke="#3B82F6" stroke-width="1" fill="none" opacity="0.22" stroke-linecap="round"/>
+          <!-- Ticks -->
+          <line x1="40" y1="10" x2="40" y2="16" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+          <line x1="15" y1="28" x2="20" y2="33" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+          <line x1="65" y1="28" x2="60" y2="33" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+          <!-- Needle from orb center -->
+          <line x1="40" y1="48" x2="57" y2="26" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+          <!-- Orb — blue -->
+          <circle cx="40" cy="48" r="11" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.4)" stroke-width="1"/>
+          <circle cx="40" cy="48" r="11" fill="none" stroke="rgba(59,130,246,0.4)" stroke-width="0.8">
+            <animate attributeName="r" from="11" to="22" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" from="0.6" to="0" dur="3s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="40" cy="48" r="11" fill="none" stroke="rgba(59,130,246,0.4)" stroke-width="0.8">
+            <animate attributeName="r" from="11" to="22" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" from="0.6" to="0" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+          </circle>
+          <!-- PipMark — blue -->
+          <circle cx="40" cy="45" r="4" fill="#3B82F6">
+            <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="40" cy="53" r="2.8" fill="#3B82F6" fill-opacity="0.42"/>
+        </svg>
+      </div>
+      <div class="app-name">Gauge</div>
+      <div class="app-desc">Project<br>Management</div>
+      <div class="soon-tag">Coming Soon</div>
+    </div>
+
+  </div>
+
+  <div class="tagline">From the conference floor to year-round relationships. One suite. Powered by Pip.</div>
+
+  <!-- ══════════ FLOATING PIP ══════════ -->
+  <div id="pip" style="position:fixed;z-index:20;pointer-events:none;transform:translate(-50%,-50%);">
+    <div class="pip-sonar" style="
+      width:52px;height:52px;border-radius:50%;
+      background:rgba(200,136,58,0.12);
+      border:1px solid rgba(200,136,58,0.4);
+      box-shadow:0 0 20px rgba(200,136,58,0.22);
+      display:flex;align-items:center;justify-content:center;
+      transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;">
+      <svg id="pip-svg" class="pip-pulse" width="14" height="28" viewBox="0 0 10 20" fill="none">
+        <circle cx="5" cy="5" r="7" fill="#C8883A" fill-opacity="0.1"/>
+        <circle cx="5" cy="5" r="4" fill="#C8883A"/>
+        <circle cx="5" cy="15" r="5" fill="#C8883A" fill-opacity="0.07"/>
+        <circle cx="5" cy="15" r="2.8" fill="#C8883A" fill-opacity="0.42"/>
+      </svg>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var pip   = document.getElementById('pip');
+      var orb   = pip.querySelector('.pip-sonar');
+      var dots  = pip.querySelectorAll('circle');
+      var suite = document.querySelector('.suite');
+      var t     = Math.random() * Math.PI * 2;
+
+      var APPS = [
+        { id: 'app-lanyard', rgb: [78,  204, 163] },
+        { id: 'app-folio',   rgb: [200, 136, 58]  },
+        { id: 'app-gauge',   rgb: [59,  130, 246] },
+      ];
+      var BASE = [200, 136, 58]; // amber when away from all apps
+      var INFLUENCE = 170;       // px — how close before color shifts
+
+      var cx, cy, rx, ry, appCenters = [];
+
+      function measure() {
+        var sr = suite.getBoundingClientRect();
+        cx = sr.left + sr.width  / 2;
+        cy = sr.top  + sr.height / 2;
+        rx = sr.width  / 2 + 52;
+        ry = sr.height / 2 + 36;
+        appCenters = APPS.map(function (a) {
+          var el = document.getElementById(a.id);
+          var er = el.getBoundingClientRect();
+          return { x: er.left + er.width / 2, y: er.top + er.height / 2, rgb: a.rgb };
+        });
+      }
+
+      function applyColor(r, g, b) {
+        var R = Math.round(Math.max(0, Math.min(255, r)));
+        var G = Math.round(Math.max(0, Math.min(255, g)));
+        var B = Math.round(Math.max(0, Math.min(255, b)));
+        orb.style.background  = 'rgba('+R+','+G+','+B+',0.12)';
+        orb.style.border      = '1px solid rgba('+R+','+G+','+B+',0.4)';
+        orb.style.boxShadow   = '0 0 20px rgba('+R+','+G+','+B+',0.22)';
+        pip.style.setProperty('--pr', R+','+G+','+B);
+        dots.forEach(function (d) { d.setAttribute('fill', 'rgb('+R+','+G+','+B+')'); });
+      }
+
+      function tick() {
+        t += 0.0005;
+        var x = cx + Math.cos(t) * rx;
+        var y = cy + Math.sin(t) * ry;
+        pip.style.left = x + 'px';
+        pip.style.top  = y + 'px';
+
+        // Blend color toward nearest app
+        var r = BASE[0], g = BASE[1], b = BASE[2];
+        appCenters.forEach(function (app) {
+          var dx   = x - app.x;
+          var dy   = y - app.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < INFLUENCE) {
+            var s = 1 - dist / INFLUENCE;
+            s = s * s * s; // cubic — strong shift only when very close
+            r += (app.rgb[0] - BASE[0]) * s;
+            g += (app.rgb[1] - BASE[1]) * s;
+            b += (app.rgb[2] - BASE[2]) * s;
+          }
+        });
+
+        applyColor(r, g, b);
+        requestAnimationFrame(tick);
+      }
+
+      window.addEventListener('load', function () {
+        measure();
+        window.addEventListener('resize', measure);
+        requestAnimationFrame(tick);
+      });
+    })();
+  </script>
+
+</body>
+</html>
