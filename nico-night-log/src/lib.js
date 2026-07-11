@@ -1,0 +1,253 @@
+// ── Nico Night Log — pure logic helpers ─────────────────────────────
+
+export const STORAGE_KEY = 'nico-night-log'
+
+export const TYPE_LABEL = {
+  bedtime: 'Bedtime',
+  wake: 'Woke up',
+  check: 'Check',
+  rescue: 'Rescue',
+  binky: 'Binky search',
+  feed: 'Fed',
+  asleep: 'Back asleep',
+  wakeforday: 'Up for day',
+}
+
+// ── time / duration formatting ──────────────────────────────────────
+
+// 2:14a  /  11:05p
+export function fmtTime(ts) {
+  const d = new Date(ts)
+  let h = d.getHours()
+  const m = d.getMinutes()
+  const ap = h < 12 ? 'a' : 'p'
+  h = h % 12
+  if (h === 0) h = 12
+  return `${h}:${String(m).padStart(2, '0')}${ap}`
+}
+
+// 12m  /  1h 26m
+export function fmtHM(ms) {
+  const min = Math.max(0, Math.round(ms / 60000))
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+// mm:ss counting-up timer
+export function fmtClock(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+export function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+// ── feed detail text ────────────────────────────────────────────────
+
+export function feedText(e) {
+  if (e.feedSource === 'breast') return 'breast'
+  if (e.feedSource === 'bottle') {
+    const plus = e.note === '5+' ? '+' : ''
+    return `bottle ${e.feedOz}oz${plus}`
+  }
+  return 'fed'
+}
+
+// ── derive current status from chronological events ─────────────────
+
+export function deriveStatus(events) {
+  let status = 'preBed' // preBed | asleep | awake | day
+  let wakeTs = null
+  let asleepSince = null
+  let bedtime = null
+  let upForDay = null
+  for (const e of events) {
+    switch (e.type) {
+      case 'bedtime':
+        status = 'asleep'
+        bedtime = e.ts
+        asleepSince = e.ts
+        break
+      case 'wake':
+        status = 'awake'
+        wakeTs = e.ts
+        asleepSince = null
+        break
+      case 'asleep':
+        status = 'asleep'
+        wakeTs = null
+        asleepSince = e.ts
+        break
+      case 'wakeforday':
+        status = 'day'
+        wakeTs = null
+        asleepSince = null
+        upForDay = e.ts
+        break
+      default:
+        break
+    }
+  }
+  return { status, wakeTs, asleepSince, bedtime, upForDay }
+}
+
+// ── pair wakes with the next asleep → wakings ───────────────────────
+
+export function getWakings(events) {
+  const wakings = []
+  let cur = null
+  for (const e of events) {
+    if (e.type === 'wake') {
+      if (cur) wakings.push(cur)
+      cur = { wakeId: e.id, wakeTs: e.ts, asleepTs: null, ended: false, feeds: [], members: [] }
+    } else if (cur) {
+      if (e.type === 'asleep') {
+        cur.asleepTs = e.ts
+        cur.ended = true
+        wakings.push(cur)
+        cur = null
+      } else if (e.type === 'wakeforday') {
+        cur.ended = true // ended the night without resettling
+        wakings.push(cur)
+        cur = null
+      } else if (e.type === 'feed') {
+        cur.feeds.push(e)
+        cur.members.push(e)
+      } else if (e.type === 'check' || e.type === 'rescue' || e.type === 'binky') {
+        cur.members.push(e)
+      }
+    }
+  }
+  if (cur) wakings.push(cur) // still open — baby currently awake
+  return wakings
+}
+
+// summary tag for a waking, e.g. "FEED bottle 3oz" or "resettle"
+export function wakingTag(w) {
+  if (w.feeds.length > 0) {
+    return 'FEED ' + w.feeds.map(feedText).join(' + ')
+  }
+  return 'resettle'
+}
+
+// one line like "2:15a→2:41a (26m, FEED bottle 3oz)"
+export function wakingLine(w, now) {
+  const start = fmtTime(w.wakeTs)
+  if (w.asleepTs) {
+    const dur = fmtHM(w.asleepTs - w.wakeTs)
+    return `${start}→${fmtTime(w.asleepTs)} (${dur}, ${wakingTag(w)})`
+  }
+  if (w.ended) {
+    return `${start}→up for day (${wakingTag(w)})`
+  }
+  const dur = fmtHM(now - w.wakeTs)
+  return `${start}→ongoing (${dur}, ${wakingTag(w)})`
+}
+
+// ── longest stretch asleep ──────────────────────────────────────────
+
+export function longestGap(events, now) {
+  let best = null
+  let sleepStart = null
+  const consider = (from, to) => {
+    const span = to - from
+    if (!best || span > best.span) best = { span, from, to }
+  }
+  for (const e of events) {
+    if (e.type === 'bedtime' || e.type === 'asleep') {
+      sleepStart = e.ts
+    } else if (e.type === 'wake' || e.type === 'wakeforday') {
+      if (sleepStart != null) {
+        consider(sleepStart, e.ts)
+        sleepStart = null
+      }
+    }
+  }
+  if (sleepStart != null) consider(sleepStart, now) // still asleep now
+  return best
+}
+
+// ── live tally ──────────────────────────────────────────────────────
+
+export function getTally(events) {
+  let wakings = 0
+  let feeds = 0
+  let oz = 0
+  for (const e of events) {
+    if (e.type === 'wake') wakings++
+    if (e.type === 'feed') {
+      feeds++
+      if (e.feedSource === 'bottle' && typeof e.feedOz === 'number') oz += e.feedOz
+    }
+  }
+  const last = events.length ? events[events.length - 1].ts : null
+  return { wakings, feeds, oz, lastTs: last }
+}
+
+// ── export text ─────────────────────────────────────────────────────
+
+export function buildExport(events, now) {
+  const { bedtime, upForDay } = deriveStatus(events)
+  const wakings = getWakings(events)
+  const feedEvents = events.filter((e) => e.type === 'feed')
+  const bottleFeeds = feedEvents.filter((e) => e.feedSource === 'bottle')
+  const breastFeeds = feedEvents.filter((e) => e.feedSource === 'breast')
+  const totalOz = bottleFeeds.reduce((a, e) => a + (e.feedOz || 0), 0)
+
+  const feedWakings = wakings.filter((w) => w.feeds.length > 0).length
+  const resettleWakings = wakings.length - feedWakings
+
+  const dateRef = bedtime || (events[0] && events[0].ts) || now
+  const gap = longestGap(events, now)
+
+  const L = []
+  L.push(`NICO NIGHT LOG — ${fmtDate(dateRef)}`)
+  L.push(
+    `Bedtime: ${bedtime ? fmtTime(bedtime) : '—'} | Up for day: ${
+      upForDay ? fmtTime(upForDay) : 'still going'
+    }`,
+  )
+  if (bedtime && upForDay) {
+    L.push(`Night length: ${fmtHM(upForDay - bedtime)}`)
+  }
+  L.push('')
+  L.push('SUMMARY')
+  L.push(`- Wakings: ${wakings.length}  (Feeds: ${feedWakings}, Resettles: ${resettleWakings})`)
+  L.push(
+    `- Total milk: ${totalOz} oz across ${bottleFeeds.length} bottle feed${
+      bottleFeeds.length === 1 ? '' : 's'
+    } + ${breastFeeds.length} breast feed${breastFeeds.length === 1 ? '' : 's'}`,
+  )
+  if (wakings.length) {
+    L.push('- Resettle times:')
+    for (const w of wakings) L.push(`    ${wakingLine(w, now)}`)
+  } else {
+    L.push('- Resettle times: none')
+  }
+  if (gap) {
+    L.push(
+      `- Longest gap asleep: ${fmtHM(gap.span)} between ${fmtTime(gap.from)} and ${fmtTime(gap.to)}`,
+    )
+  } else {
+    L.push('- Longest gap asleep: —')
+  }
+  L.push('')
+  L.push('CHRONOLOGICAL')
+  for (const e of events) {
+    const label = TYPE_LABEL[e.type] || e.type
+    const detail = e.type === 'feed' ? ` — ${feedText(e)}` : ''
+    L.push(`${fmtTime(e.ts)} — ${label}${detail}`)
+  }
+
+  return L.join('\n')
+}
