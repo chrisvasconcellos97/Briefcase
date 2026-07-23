@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   STORAGE_KEY,
+  HISTORY_KEY,
   TYPE_LABEL,
   fmtTime,
   fmtHM,
   fmtClock,
+  fmtDate,
   feedText,
   deriveStatus,
   getWakings,
@@ -17,6 +19,9 @@ import {
   CHECK_INTERVAL_MS,
   getSleepOnset,
   onsetLine,
+  getNightSummary,
+  buildTimelineSegments,
+  buildHourMarks,
 } from './lib'
 import {
   MoonIcon,
@@ -50,6 +55,28 @@ function saveEvents(events) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
   } catch {
     /* storage full / private mode — nothing we can do, keep going in-memory */
+  }
+}
+
+const MAX_HISTORY_NIGHTS = 60
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((n) => n && Array.isArray(n.events))
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(history) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+  } catch {
+    /* storage full / private mode */
   }
 }
 
@@ -108,11 +135,13 @@ function playChime(ctx) {
 
 export default function App() {
   const [events, setEvents] = useState(loadEvents)
+  const [history, setHistory] = useState(loadHistory)
   const [now, setNow] = useState(() => Date.now())
   const [feedOpen, setFeedOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmNew, setConfirmNew] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
   const audioCtxRef = useRef(null)
@@ -127,6 +156,27 @@ export default function App() {
     const e = { id: newId(), ts: Date.now(), ...partial }
     commit([...events, e])
     return e
+  }
+
+  // Saves the in-progress night into history — never destructive.
+  function archiveCurrentNight() {
+    if (events.length === 0) return
+    const night = { id: newId(), savedAt: Date.now(), events }
+    const nextHistory = [night, ...history].slice(0, MAX_HISTORY_NIGHTS)
+    saveHistory(nextHistory)
+    setHistory(nextHistory)
+  }
+
+  // Bedtime after a night was already wrapped up (Up for day tapped)
+  // quietly archives the old night first, instead of appending onto it.
+  function startBedtime() {
+    if (status.status === 'day' && events.length > 0) {
+      archiveCurrentNight()
+      const e = { id: newId(), ts: Date.now(), type: 'bedtime' }
+      commit([e])
+    } else {
+      addEvent({ type: 'bedtime' })
+    }
   }
 
   function editEvent(id, patch) {
@@ -242,6 +292,7 @@ export default function App() {
   }
 
   function doNewNight() {
+    archiveCurrentNight()
     commit([])
     setConfirmNew(false)
     setMenuOpen(false)
@@ -256,6 +307,15 @@ export default function App() {
   const reversed = useMemo(() => [...events].slice().reverse(), [events])
   const bedtimeLogged = status.bedtime != null
   const dayEnded = status.status === 'day'
+
+  const nightsForReview = useMemo(() => {
+    const list = []
+    if (events.length > 0) list.push({ id: 'current', events, isCurrent: true })
+    for (const h of history) list.push({ id: h.id, events: h.events, isCurrent: false })
+    return list
+      .map((n) => ({ ...n, summary: getNightSummary(n.events, now) }))
+      .sort((a, b) => b.summary.dateRef - a.summary.dateRef)
+  }, [events, history, now])
 
   return (
     <div className="mx-auto flex h-full max-w-md flex-col px-4 pb-3 pt-2 text-slate">
@@ -372,7 +432,7 @@ export default function App() {
           bedtimeLogged={bedtimeLogged}
           dayEnded={dayEnded}
           onBedtime={() => {
-            addEvent({ type: 'bedtime' })
+            startBedtime()
             setMenuOpen(false)
           }}
           onUpForDay={() => {
@@ -381,12 +441,19 @@ export default function App() {
             setMenuOpen(false)
           }}
           onCopy={doCopy}
+          onReview={() => {
+            setMenuOpen(false)
+            setReviewOpen(true)
+          }}
           onNewNight={() => {
             setMenuOpen(false)
             setConfirmNew(true)
           }}
         />
       )}
+
+      {/* Night review */}
+      {reviewOpen && <NightReview nights={nightsForReview} onClose={() => setReviewOpen(false)} />}
 
       {/* New-night confirm */}
       {confirmNew && (
@@ -678,7 +745,16 @@ function EmptyState({ bedtimeLogged }) {
 
 // ── Menu sheet ──────────────────────────────────────────────────────
 
-function MenuSheet({ onClose, onBedtime, onUpForDay, onCopy, onNewNight, bedtimeLogged, dayEnded }) {
+function MenuSheet({
+  onClose,
+  onBedtime,
+  onUpForDay,
+  onCopy,
+  onReview,
+  onNewNight,
+  bedtimeLogged,
+  dayEnded,
+}) {
   const item =
     'min-h-[60px] w-full rounded-2xl px-4 text-left font-serif text-base ring-1 ring-white/10 transition-transform active:scale-95'
   return (
@@ -695,6 +771,9 @@ function MenuSheet({ onClose, onBedtime, onUpForDay, onCopy, onNewNight, bedtime
         </button>
         <button onClick={onUpForDay} className={`${item} bg-white/[0.03] text-cream`}>
           ☀️ Up for day
+        </button>
+        <button onClick={onReview} className={`${item} bg-white/[0.03] text-dusk`}>
+          📖 Night review
         </button>
         <button onClick={onCopy} className={`${item} bg-white/[0.03] text-slate`}>
           ⧉ Copy for Claude
@@ -719,7 +798,9 @@ function ConfirmNewNight({ hasEvents, onExportFirst, onCancel, onConfirm }) {
       <div className="relative w-full max-w-sm rounded-3xl bg-panel p-5 ring-1 ring-white/10">
         <div className="font-serif text-lg text-cream">Start a new night?</div>
         <div className="mt-1 text-sm text-slate-dim">
-          This clears the current log. {hasEvents && 'Export first so you don’t lose it.'}
+          {hasEvents
+            ? "Tonight's log gets saved to Night Review automatically — nothing is lost."
+            : 'This clears the current log.'}
         </div>
         <div className="mt-4 space-y-2">
           {hasEvents && (
@@ -727,7 +808,7 @@ function ConfirmNewNight({ hasEvents, onExportFirst, onCancel, onConfirm }) {
               onClick={onExportFirst}
               className="min-h-[56px] w-full rounded-2xl bg-white/[0.03] text-base font-semibold text-amber ring-1 ring-amber/25 active:scale-95"
             >
-              ⧉ Copy export first
+              ⧉ Copy export too
             </button>
           )}
           <button
@@ -879,6 +960,236 @@ function EditSheet({ event, onSave, onDelete, onClose }) {
               </button>
             </div>
           </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Night review ─────────────────────────────────────────────────────
+
+const DOT_BG = {
+  bedtime: 'bg-cream',
+  wake: 'bg-amber',
+  asleep: 'bg-dusk',
+  wakeforday: 'bg-cream',
+  feed: 'bg-amber',
+  check: 'bg-rose',
+  rescue: 'bg-sage',
+}
+
+const REVIEW_TEXT = {
+  bedtime: 'text-cream',
+  wake: 'text-amber',
+  asleep: 'text-dusk',
+  wakeforday: 'text-cream',
+  feed: 'text-amber',
+  check: 'text-rose',
+  rescue: 'text-sage',
+}
+
+function NightReview({ nights, onClose }) {
+  const [selected, setSelected] = useState(null)
+
+  if (selected) {
+    return <NightDetail night={selected} onBack={() => setSelected(null)} onClose={onClose} />
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-night">
+      <div
+        className="flex items-center gap-3 px-4 pb-2"
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+      >
+        <button
+          onClick={onClose}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-slate-dim active:scale-95"
+        >
+          <ChevronIcon className="h-4 w-4 rotate-180" />
+        </button>
+        <div className="font-serif text-xl text-cream">Night review</div>
+      </div>
+      <div className="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
+        {nights.length === 0 ? (
+          <div className="mt-16 text-center text-sm text-slate-dim">No nights logged yet.</div>
+        ) : (
+          <div className="space-y-2 pt-2">
+            {nights.map((n) => (
+              <NightCard key={n.id} night={n} onClick={() => setSelected(n)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function NightCard({ night, onClick }) {
+  const s = night.summary
+  return (
+    <button
+      onClick={onClick}
+      className="w-full rounded-2xl bg-white/[0.03] px-4 py-3.5 text-left ring-1 ring-white/10 transition-transform active:scale-[0.98]"
+    >
+      <div className="flex items-center justify-between">
+        <div className="font-serif text-base text-cream">
+          {night.isCurrent ? 'Tonight' : fmtDate(s.dateRef)}
+        </div>
+        {!s.upForDay && (
+          <span className="rounded-full bg-amber/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber">
+            In progress
+          </span>
+        )}
+      </div>
+      <div className="mt-1 text-xs text-slate-dim">
+        {s.bedtime ? fmtTime(s.bedtime) : '—'} → {s.upForDay ? fmtTime(s.upForDay) : 'ongoing'}
+        {s.totalSleepMs != null && `  ·  ${fmtHM(s.totalSleepMs)} in bed`}
+      </div>
+      <div className="mt-2 flex gap-4 text-xs">
+        <span className="text-amber">{s.wakings} wakings</span>
+        <span className="text-amber">{s.feeds} feeds</span>
+        {s.oz > 0 && <span className="text-amber">{s.oz} oz</span>}
+      </div>
+    </button>
+  )
+}
+
+const TIMELINE_HEIGHT = 640
+const TIMELINE_GUTTER = 40
+
+function NightDetail({ night, onBack, onClose }) {
+  const events = night.events
+  const s = night.summary
+  const rangeStart = s.bedtime || (events[0] && events[0].ts) || null
+  const rangeEnd = s.upForDay || Date.now()
+
+  const segments = useMemo(
+    () => buildTimelineSegments(events, rangeStart, rangeEnd),
+    [events, rangeStart, rangeEnd],
+  )
+  const hourMarks = useMemo(
+    () => buildHourMarks(rangeStart, rangeEnd),
+    [rangeStart, rangeEnd],
+  )
+
+  function yFor(ts) {
+    if (!rangeStart || rangeEnd <= rangeStart) return 0
+    const frac = (ts - rangeStart) / (rangeEnd - rangeStart)
+    return Math.max(0, Math.min(1, frac)) * TIMELINE_HEIGHT
+  }
+
+  // Events fired seconds/minutes apart (e.g. Woke up → Check) land at
+  // nearly the same y and their labels overlap. Push each row down just
+  // enough to stay legible — the colored bar segments stay perfectly
+  // proportional regardless, so accuracy isn't lost where it matters.
+  const ROW_H = 24
+  const rows = useMemo(() => {
+    const r = events.map((e) => ({ e, y: yFor(e.ts) }))
+    for (let i = 1; i < r.length; i++) {
+      if (r[i].y < r[i - 1].y + ROW_H) {
+        r[i].y = r[i - 1].y + ROW_H
+      }
+    }
+    return r
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, rangeStart, rangeEnd])
+
+  // A dense cluster of events can push the last row below TIMELINE_HEIGHT —
+  // grow the scroll container so those rows stay reachable.
+  const containerHeight = Math.max(
+    TIMELINE_HEIGHT,
+    rows.length ? rows[rows.length - 1].y + 40 : TIMELINE_HEIGHT,
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-night">
+      <div
+        className="flex items-center gap-3 px-4 pb-2"
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+      >
+        <button
+          onClick={onBack}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-slate-dim active:scale-95"
+        >
+          <ChevronIcon className="h-4 w-4 rotate-180" />
+        </button>
+        <div className="font-serif text-xl text-cream">
+          {night.isCurrent ? 'Tonight' : fmtDate(s.dateRef)}
+        </div>
+        <button onClick={onClose} className="ml-auto text-sm font-semibold text-slate-dim active:scale-95">
+          Close
+        </button>
+      </div>
+
+      <div className="mx-4 mb-2 flex items-center rounded-xl bg-white/[0.03] px-2 py-3">
+        <Stat icon={<MoonIcon className="h-4 w-4 text-amber" />} label="wakings" value={s.wakings} />
+        <Div />
+        <Stat icon={<BottleIcon className="h-4 w-4 text-amber" />} label="feeds" value={s.feeds} />
+        <Div />
+        <Stat icon={<DropletIcon className="h-4 w-4 text-amber" />} label="oz" value={s.oz} />
+        <Div />
+        <Stat
+          icon={<ClockIcon className="h-4 w-4 text-amber" />}
+          label="in bed"
+          value={s.totalSleepMs != null ? fmtHM(s.totalSleepMs) : '—'}
+        />
+      </div>
+
+      <div className="no-scrollbar flex-1 overflow-y-auto px-4 pb-8">
+        {!rangeStart ? (
+          <div className="mt-16 text-center text-sm text-slate-dim">Nothing logged for this night.</div>
+        ) : (
+          <div className="relative" style={{ height: containerHeight + 20 }}>
+            {hourMarks.map((h) => (
+              <div
+                key={h.ts}
+                className="absolute left-0 right-0 flex items-center gap-2"
+                style={{ top: yFor(h.ts) }}
+              >
+                <span className="w-9 shrink-0 text-right text-[10px] text-slate-dim/50">{h.label}</span>
+                <div className="h-px flex-1 bg-white/[0.05]" />
+              </div>
+            ))}
+
+            <div
+              className="absolute top-0"
+              style={{ left: TIMELINE_GUTTER, width: 3, height: TIMELINE_HEIGHT }}
+            >
+              {segments.map((seg, i) => (
+                <div
+                  key={i}
+                  className={`absolute w-full rounded-full ${
+                    seg.kind === 'asleep' ? 'bg-dusk/70' : 'bg-amber/60'
+                  }`}
+                  style={{
+                    top: yFor(seg.fromTs),
+                    height: Math.max(2, yFor(seg.toTs) - yFor(seg.fromTs)),
+                  }}
+                />
+              ))}
+            </div>
+
+            {rows.map(({ e, y }) => (
+              <div key={e.id} className="absolute left-0 right-0 flex items-center" style={{ top: y - 6 }}>
+                <span style={{ width: TIMELINE_GUTTER }} className="shrink-0" />
+                <span
+                  className={`h-[9px] w-[9px] shrink-0 rounded-full ring-2 ring-night ${
+                    DOT_BG[e.type] || 'bg-slate'
+                  }`}
+                  style={{ marginLeft: -6 }}
+                />
+                <div className="ml-2.5 flex items-baseline gap-2 rounded-lg bg-white/[0.035] px-2.5 py-1">
+                  <span className="text-[11px] tabular-nums text-slate-dim">{fmtTime(e.ts)}</span>
+                  <span className={`text-[12.5px] font-semibold ${REVIEW_TEXT[e.type] || 'text-slate'}`}>
+                    {TYPE_LABEL[e.type] || e.type}
+                  </span>
+                  {e.type === 'feed' && (
+                    <span className="text-[11px] text-slate-dim">— {feedText(e)}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

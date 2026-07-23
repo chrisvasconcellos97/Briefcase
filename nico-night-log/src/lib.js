@@ -1,6 +1,7 @@
 // ── Nico Night Log — pure logic helpers ─────────────────────────────
 
 export const STORAGE_KEY = 'nico-night-log'
+export const HISTORY_KEY = 'nico-night-log-history'
 
 export const TYPE_LABEL = {
   bedtime: 'Bedtime',
@@ -319,4 +320,59 @@ export function buildExport(events, now) {
   }
 
   return L.join('\n')
+}
+
+// ── night review (past-night summaries + timeline) ────────────────────
+
+// One-line stats for a night-review list card.
+export function getNightSummary(events, now) {
+  const status = deriveStatus(events)
+  const tally = getTally(events)
+  const dateRef = status.bedtime || (events[0] && events[0].ts) || now
+  const totalSleepMs = status.bedtime && status.upForDay ? status.upForDay - status.bedtime : null
+  return {
+    dateRef,
+    bedtime: status.bedtime,
+    upForDay: status.upForDay,
+    totalSleepMs,
+    wakings: tally.wakings,
+    feeds: tally.feeds,
+    oz: tally.oz,
+  }
+}
+
+// Alternating asleep/awake spans across [rangeStart, rangeEnd], for drawing
+// the timeline bar. 'bedtime'/'wake' start an awake span, 'asleep' starts
+// an asleep span — matches deriveStatus's status machine.
+export function buildTimelineSegments(events, rangeStart, rangeEnd) {
+  if (!rangeStart || !rangeEnd || rangeEnd <= rangeStart) return []
+  const segs = []
+  let curKind = 'awake'
+  let curFrom = rangeStart
+  for (const e of events) {
+    if (e.ts <= rangeStart || e.ts >= rangeEnd) continue
+    let nextKind = null
+    if (e.type === 'asleep') nextKind = 'asleep'
+    else if (e.type === 'wake' || e.type === 'bedtime') nextKind = 'awake'
+    if (nextKind && nextKind !== curKind) {
+      segs.push({ fromTs: curFrom, toTs: e.ts, kind: curKind })
+      curFrom = e.ts
+      curKind = nextKind
+    }
+  }
+  segs.push({ fromTs: curFrom, toTs: rangeEnd, kind: curKind })
+  return segs
+}
+
+// Hour gridlines between rangeStart and rangeEnd, e.g. { ts, label: "9p" }.
+export function buildHourMarks(rangeStart, rangeEnd) {
+  if (!rangeStart || !rangeEnd || rangeEnd <= rangeStart) return []
+  const marks = []
+  const first = new Date(rangeStart)
+  first.setMinutes(0, 0, 0)
+  if (first.getTime() <= rangeStart) first.setHours(first.getHours() + 1)
+  for (let t = first.getTime(); t < rangeEnd; t += 3600000) {
+    marks.push({ ts: t, label: fmtTime(t).replace(':00', '') })
+  }
+  return marks
 }

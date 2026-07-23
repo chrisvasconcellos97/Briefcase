@@ -15,6 +15,7 @@ export default {
         'amber-deep': '#A9741F',
         rose: '#E0654F',
         sage: '#7CB07C',
+        dusk: '#8C9AE8',
       },
       fontFamily: {
         sans: ['DM Sans', 'system-ui', '-apple-system', 'sans-serif'],
