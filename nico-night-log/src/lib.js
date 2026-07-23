@@ -38,12 +38,20 @@ export function toTimeInputValue(ts) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-// Apply an "HH:MM" wall-clock value onto the same calendar day as ts.
+// Apply an "HH:MM" wall-clock value near ts, picking whichever of
+// {same day, day before, day after} lands closest to ts — so backlogging
+// a bedtime from "3am" back to "11pm" correctly lands on the prior night
+// instead of 20 hours in the future.
 export function applyTimeInputValue(ts, hhmm) {
   const [h, m] = hhmm.split(':').map(Number)
-  const d = new Date(ts)
-  d.setHours(h, m, 0, 0)
-  return d.getTime()
+  const base = new Date(ts)
+  base.setHours(h, m, 0, 0)
+  const candidates = [-1, 0, 1].map((dayOffset) => {
+    const d = new Date(base)
+    d.setDate(d.getDate() + dayOffset)
+    return d.getTime()
+  })
+  return candidates.reduce((best, c) => (Math.abs(c - ts) < Math.abs(best - ts) ? c : best))
 }
 
 // 2:14a  /  11:05p
