@@ -107,29 +107,37 @@ export function feedText(e) {
 export function deriveStatus(events) {
   let status = 'preBed' // preBed | asleep | awake | day
   let wakeTs = null
+  let wakeSource = null // 'bedtime' (still settling in) | 'wake' (overnight waking)
   let asleepSince = null
   let bedtime = null
   let upForDay = null
   for (const e of events) {
     switch (e.type) {
       case 'bedtime':
-        status = 'asleep'
+        // Laid down awake — sleep hasn't started yet. Reuses the same
+        // "awake" state/timer as an overnight waking until "asleep" is tapped.
+        status = 'awake'
         bedtime = e.ts
-        asleepSince = e.ts
+        wakeTs = e.ts
+        wakeSource = 'bedtime'
+        asleepSince = null
         break
       case 'wake':
         status = 'awake'
         wakeTs = e.ts
+        wakeSource = 'wake'
         asleepSince = null
         break
       case 'asleep':
         status = 'asleep'
         wakeTs = null
+        wakeSource = null
         asleepSince = e.ts
         break
       case 'wakeforday':
         status = 'day'
         wakeTs = null
+        wakeSource = null
         asleepSince = null
         upForDay = e.ts
         break
@@ -137,7 +145,25 @@ export function deriveStatus(events) {
         break
     }
   }
-  return { status, wakeTs, asleepSince, bedtime, upForDay }
+  return { status, wakeTs, wakeSource, asleepSince, bedtime, upForDay }
+}
+
+// ── time to fall asleep at bedtime (distinct from an overnight waking) ─
+
+export function getSleepOnset(events) {
+  const bedtimeEvt = events.find((e) => e.type === 'bedtime')
+  if (!bedtimeEvt) return null
+  const asleepEvt = events.find((e) => e.type === 'asleep' && e.ts >= bedtimeEvt.ts)
+  return { bedtimeTs: bedtimeEvt.ts, asleepTs: asleepEvt ? asleepEvt.ts : null }
+}
+
+// "9:40p→9:58p (18m)" or "9:40p→ongoing (12m so far)"
+export function onsetLine(onset, now) {
+  const start = fmtTime(onset.bedtimeTs)
+  if (onset.asleepTs) {
+    return `${start}→${fmtTime(onset.asleepTs)} (${fmtHM(onset.asleepTs - onset.bedtimeTs)})`
+  }
+  return `${start}→ongoing (${fmtHM(now - onset.bedtimeTs)} so far)`
 }
 
 // ── pair wakes with the next asleep → wakings ───────────────────────
@@ -203,7 +229,7 @@ export function longestGap(events, now) {
     if (!best || span > best.span) best = { span, from, to }
   }
   for (const e of events) {
-    if (e.type === 'bedtime' || e.type === 'asleep') {
+    if (e.type === 'asleep') {
       sleepStart = e.ts
     } else if (e.type === 'wake' || e.type === 'wakeforday') {
       if (sleepStart != null) {
@@ -248,6 +274,7 @@ export function buildExport(events, now) {
 
   const dateRef = bedtime || (events[0] && events[0].ts) || now
   const gap = longestGap(events, now)
+  const onset = getSleepOnset(events)
 
   const L = []
   L.push(`NICO NIGHT LOG — ${fmtDate(dateRef)}`)
@@ -261,6 +288,9 @@ export function buildExport(events, now) {
   }
   L.push('')
   L.push('SUMMARY')
+  if (onset) {
+    L.push(`- Time to fall asleep: ${onsetLine(onset, now)}`)
+  }
   L.push(`- Wakings: ${wakings.length}  (Feeds: ${feedWakings}, Resettles: ${resettleWakings})`)
   L.push(
     `- Total milk: ${totalOz} oz across ${bottleFeeds.length} bottle feed${

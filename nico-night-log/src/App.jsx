@@ -15,6 +15,8 @@ import {
   toTimeInputValue,
   applyTimeInputValue,
   CHECK_INTERVAL_MS,
+  getSleepOnset,
+  onsetLine,
 } from './lib'
 import {
   MoonIcon,
@@ -181,6 +183,8 @@ export default function App() {
   const tally = useMemo(() => getTally(events), [events])
   const wakings = useMemo(() => getWakings(events), [events])
   const isAwake = status.status === 'awake'
+  const isSettling = status.wakeSource === 'bedtime'
+  const sleepOnset = useMemo(() => getSleepOnset(events), [events])
 
   const checkCycle = useMemo(
     () => (isAwake && status.wakeTs ? deriveCheckCycle(status.wakeTs, now) : null),
@@ -283,6 +287,7 @@ export default function App() {
         elapsed={wakeElapsed}
         asleepSince={status.asleepSince}
         checkCycle={checkCycle}
+        isSettling={isSettling}
       />
 
       {/* Tally */}
@@ -299,6 +304,7 @@ export default function App() {
                 key={e.id}
                 event={e}
                 waking={e.type === 'wake' ? wakeSummary.get(e.id) : null}
+                onset={e.type === 'bedtime' ? sleepOnset : null}
                 now={now}
                 onEdit={() => setEditingEvent(e)}
               />
@@ -329,7 +335,7 @@ export default function App() {
             : 'bg-gradient-to-br from-[#F0BE5E] to-[#DE9A34] text-[#241605] shadow-[0_0_0_1px_rgba(232,168,56,0.25)]')
         }
       >
-        {isAwake ? 'Back asleep' : 'Woke up'}
+        {isAwake ? (isSettling ? 'Asleep' : 'Back asleep') : 'Woke up'}
       </button>
 
       {/* Utility bar */}
@@ -415,7 +421,7 @@ export default function App() {
 
 // ── Hero ────────────────────────────────────────────────────────────
 
-function Hero({ status, elapsed, asleepSince, checkCycle }) {
+function Hero({ status, elapsed, asleepSince, checkCycle, isSettling }) {
   if (status === 'awake') {
     if (checkCycle && checkCycle.phase === 'soothe') {
       return (
@@ -443,7 +449,8 @@ function Hero({ status, elapsed, asleepSince, checkCycle }) {
           {fmtClock(remaining)}
         </div>
         <div className="mt-1.5 text-xs text-slate-dim">
-          Awake {fmtClock(elapsed)} total{checkCycle ? ` · check ${checkCycle.cycleNum}` : ''}
+          {isSettling ? 'Settling in' : 'Awake'} {fmtClock(elapsed)} total
+          {checkCycle ? ` · check ${checkCycle.cycleNum}` : ''}
         </div>
       </div>
     )
@@ -612,10 +619,11 @@ const TYPE_ACCENT = {
   rescue: 'text-slate',
 }
 
-function LogRow({ event, waking, now, onEdit }) {
+function LogRow({ event, waking, onset, now, onEdit }) {
   const label = TYPE_LABEL[event.type] || event.type
   const detail = event.type === 'feed' ? feedText(event) : null
   const isWakeHead = event.type === 'wake'
+  const isBedtimeHead = event.type === 'bedtime'
   return (
     <li>
       <button
@@ -642,6 +650,11 @@ function LogRow({ event, waking, now, onEdit }) {
               : waking.ended
                 ? '↳ up for day'
                 : '↳ ongoing…'}
+          </div>
+        )}
+        {isBedtimeHead && onset && (
+          <div className="mt-0.5 pl-16 text-[11px] text-slate-dim/70">
+            {onset.asleepTs ? `↳ ${onsetLine(onset, now)} to fall asleep` : '↳ still settling…'}
           </div>
         )}
       </button>
