@@ -7,13 +7,44 @@ export const TYPE_LABEL = {
   wake: 'Woke up',
   check: 'Check',
   rescue: 'Rescue',
-  binky: 'Binky search',
   feed: 'Fed',
   asleep: 'Back asleep',
   wakeforday: 'Up for day',
 }
 
+// ── check-in timer (graduated check-ins while awake) ─────────────────
+
+export const CHECK_INTERVAL_MS = 10 * 60 * 1000
+export const SOOTHE_MS = 60 * 1000
+
+// Derived purely from the wake timestamp + wall-clock now, so it's always
+// correct even after the tab was frozen/backgrounded — nothing to resume.
+export function deriveCheckCycle(wakeTs, now) {
+  const cycle = CHECK_INTERVAL_MS + SOOTHE_MS
+  const elapsed = Math.max(0, now - wakeTs)
+  const inCycle = elapsed % cycle
+  const cycleNum = Math.floor(elapsed / cycle) + 1
+  if (inCycle < CHECK_INTERVAL_MS) {
+    return { phase: 'waiting', remainingMs: CHECK_INTERVAL_MS - inCycle, cycleNum }
+  }
+  return { phase: 'soothe', remainingMs: cycle - inCycle, cycleNum }
+}
+
 // ── time / duration formatting ──────────────────────────────────────
+
+// "HH:MM" (24h, for <input type="time">) from an epoch ms timestamp
+export function toTimeInputValue(ts) {
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// Apply an "HH:MM" wall-clock value onto the same calendar day as ts.
+export function applyTimeInputValue(ts, hhmm) {
+  const [h, m] = hhmm.split(':').map(Number)
+  const d = new Date(ts)
+  d.setHours(h, m, 0, 0)
+  return d.getTime()
+}
 
 // 2:14a  /  11:05p
 export function fmtTime(ts) {
@@ -123,7 +154,7 @@ export function getWakings(events) {
       } else if (e.type === 'feed') {
         cur.feeds.push(e)
         cur.members.push(e)
-      } else if (e.type === 'check' || e.type === 'rescue' || e.type === 'binky') {
+      } else if (e.type === 'check' || e.type === 'rescue') {
         cur.members.push(e)
       }
     }

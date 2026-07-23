@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const outDir = join(__dirname, '..', 'public')
 mkdirSync(outDir, { recursive: true })
 
-const BG = [13, 31, 28] // #0D1F1C
+const BG = [11, 15, 26] // #0B0F1A
 const MOON = [232, 168, 56] // #E8A838
 
 // CRC32
