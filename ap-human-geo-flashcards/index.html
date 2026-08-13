@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>AP Human Geo — Vocab Flashcards</title>
+<meta name="theme-color" content="#F6F4EF" />
+<style>
+  :root{
+    --bg:#F6F4EF;
+    --surface:#FFFFFF;
+    --ink:#2B2A28;
+    --ink-soft:#6B6862;
+    --accent:#3E8E7E;
+    --accent-dark:#2E6B5F;
+    --accent-soft:#DCEEE9;
+    --line:#E7E3DA;
+    --lvl0:#B9B2A6;
+    --lvl1:#E0A23D;
+    --lvl2:#4C86C7;
+    --lvl3:#4CAF7D;
+    --bad:#D96C6C;
+    --good:#4CAF7D;
+    --shadow:0 10px 30px rgba(40,35,25,0.10);
+    --radius:22px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    min-height:100%;
+    padding-bottom:96px;
+  }
+  button{font-family:inherit;}
+
+  /* ---------- Header / nav ---------- */
+  header{
+    position:sticky;top:0;z-index:30;
+    background:rgba(246,244,239,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    padding:14px 16px 10px;
+  }
+  .title{
+    font-size:15px;font-weight:700;letter-spacing:0.02em;
+    text-align:center;color:var(--ink);
+  }
+  .title small{display:block;font-weight:500;color:var(--ink-soft);font-size:11px;margin-top:2px;letter-spacing:0.06em;text-transform:uppercase;}
+  nav.tabs{
+    display:flex;gap:8px;margin-top:12px;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;
+  }
+  nav.tabs button{
+    flex:1;border:none;background:transparent;color:var(--ink-soft);
+    padding:10px 8px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;
+    transition:background .18s ease,color .18s ease;
+  }
+  nav.tabs button.active{background:var(--accent);color:#fff;}
+
+  main{max-width:520px;margin:0 auto;padding:16px;}
+
+  /* ---------- Controls row ---------- */
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  select#groupSelect{
+    flex:1;min-width:150px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink);font-size:14px;font-weight:600;
+  }
+  .toggle{
+    display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+    user-select:none;
+  }
+  .toggle input{accent-color:var(--accent);width:16px;height:16px;}
+  .toggle.on{color:var(--accent-dark);border-color:var(--accent);}
+
+  /* ---------- Session progress ---------- */
+  .session-bar{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;font-weight:600;}
+  .session-bar .track{flex:1;height:6px;background:var(--line);border-radius:6px;margin:0 10px;overflow:hidden;}
+  .session-bar .fill{height:100%;background:var(--accent);border-radius:6px;transition:width .3s ease;}
+
+  /* ---------- Card ---------- */
+  .stage{perspective:1400px;margin:6px 0 18px;}
+  .card{
+    position:relative;width:100%;min-height:340px;
+    transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,.2,.2,1);
+    cursor:pointer;
+  }
+  .card.flipped{transform:rotateY(180deg);}
+  .face{
+    position:absolute;inset:0;backface-visibility:hidden;
+    background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
+    border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:30px 24px;text-align:center;gap:14px;
+  }
+  .face.back{transform:rotateY(180deg);justify-content:flex-start;padding-top:34px;overflow-y:auto;}
+  .lvl-badge{
+    position:absolute;top:16px;right:16px;display:flex;gap:4px;align-items:center;
+    background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--ink-soft);
+  }
+  .lvl-dots{display:flex;gap:3px;}
+  .lvl-dots span{width:6px;height:6px;border-radius:50%;background:var(--line);}
+  .lvl-dots span.filled{background:var(--dotcolor,var(--accent));}
+  .term-text{font-size:1.9rem;font-weight:800;line-height:1.15;color:var(--ink);}
+  .hint-text{font-size:13px;color:var(--ink-soft);}
+  .flip-hint{font-size:12px;color:var(--ink-soft);opacity:.7;margin-top:2px;}
+
+  .mic-row{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:4px;}
+  .mic-btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--accent-soft);color:var(--accent-dark);border:1px solid var(--accent);
+    border-radius:30px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;
+  }
+  .mic-btn.listening{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulseMic 1s infinite;}
+  @keyframes pulseMic{0%,100%{opacity:1;}50%{opacity:.6;}}
+  .spoken-box{font-size:13px;color:var(--ink-soft);background:var(--bg);border-radius:10px;padding:8px 12px;max-width:100%;}
+  .spoken-box b{color:var(--ink);}
+
+  .def-label{align-self:flex-start;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-dark);font-weight:800;}
+  .def-text{align-self:flex-start;font-size:1.15rem;line-height:1.5;font-weight:600;color:var(--ink);}
+  .ex-text{align-self:flex-start;font-size:.95rem;line-height:1.5;color:var(--ink-soft);font-style:italic;}
+  mark.hit{background:#CFEFDC;color:#1F5C3D;border-radius:4px;padding:0 2px;font-style:normal;}
+  mark.miss{background:transparent;color:inherit;border-bottom:2px dotted var(--bad);border-radius:0;}
+  .compare-note{align-self:flex-start;font-size:12px;color:var(--ink-soft);}
+
+  .grade-row{display:flex;gap:10px;width:100%;margin-top:auto;padding-top:6px;}
+  .grade-row button{
+    flex:1;padding:13px 10px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:pointer;color:#fff;
+  }
+  .btn-wrong{background:var(--bad);}
+  .btn-right{background:var(--good);}
+  .grade-row button:disabled{opacity:.45;pointer-events:none;}
+
+  .nav-row{display:flex;gap:10px;justify-content:center;margin-top:4px;}
+  .nav-row button{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:12px 22px;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;
+  }
+  .nav-row button.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* ---------- Session summary ---------- */
+  .summary-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:28px 22px;text-align:center;
+  }
+  .summary-card h2{font-size:1.4rem;margin-bottom:10px;}
+  .summary-stat{font-size:2.2rem;font-weight:800;color:var(--accent-dark);margin:8px 0;}
+  .summary-sub{color:var(--ink-soft);font-size:13px;margin-bottom:18px;}
+  .summary-buttons{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+
+  /* ---------- Overview ---------- */
+  .stat-strip{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:14px;
+  }
+  .stat-strip .nums{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);font-weight:700;margin-bottom:8px;}
+  .segbar{display:flex;height:10px;border-radius:8px;overflow:hidden;background:var(--line);}
+  .segbar div{height:100%;}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--ink-soft);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .overall-line{font-size:12.5px;color:var(--ink-soft);margin-top:8px;}
+
+  .filter-row{display:flex;gap:8px;margin-bottom:14px;}
+  .filter-row button{
+    flex:1;padding:9px 6px;border-radius:12px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-soft);font-weight:700;font-size:12.5px;cursor:pointer;
+  }
+  .filter-row button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  .study-these{
+    display:block;width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;
+    padding:13px;font-size:14.5px;font-weight:700;margin-bottom:16px;cursor:pointer;
+  }
+
+  .group-heading{font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);margin:18px 0 8px;}
+  .term-row{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:8px;overflow:hidden;
+  }
+  .term-row .row-head{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;gap:10px;}
+  .row-head .name{font-weight:700;font-size:14.5px;}
+  .row-badge{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .term-row .row-body{display:none;padding:0 14px 14px;font-size:13px;color:var(--ink-soft);line-height:1.5;}
+  .term-row.open .row-body{display:block;}
+  .term-row .row-body .rdef{color:var(--ink);font-weight:600;margin-bottom:4px;}
+
+  .reset-wrap{margin-top:26px;text-align:center;}
+  .reset-btn{
+    background:transparent;border:1px solid var(--bad);color:var(--bad);border-radius:12px;
+    padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;
+  }
+
+  /* ---------- Mascot ---------- */
+  .mascot-wrap{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    display:flex;align-items:flex-end;gap:10px;padding:10px 14px 14px;
+    background:linear-gradient(to top, rgba(246,244,239,0.98) 60%, rgba(246,244,239,0));
+    pointer-events:none;
+  }
+  .mascot-wrap .bubble{
+    pointer-events:auto;
+    background:var(--surface);border:1px solid var(--line);border-radius:16px 16px 16px 4px;
+    padding:10px 14px;font-size:12.5px;font-weight:600;color:var(--ink);box-shadow:var(--shadow);
+    max-width:78%;line-height:1.4;
+  }
+  .brain{width:52px;height:52px;flex-shrink:0;pointer-events:auto;}
+
+  @media (max-width:380px){
+    .term-text{font-size:1.6rem;}
+    .card{min-height:320px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">AP Human Geo<small>Vocab Flashcards</small></div>
+  <nav class="tabs">
+    <button id="tabStudy" class="active">Study</button>
+    <button id="tabOverview">Overview</button>
+  </nav>
+</header>
+
+<main id="main"></main>
+
+<div class="mascot-wrap">
+  <svg class="brain" id="brainSvg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M30 20 C18 20 12 30 14 40 C7 44 7 56 15 60 C13 70 22 80 33 78 C37 86 55 88 61 80 C72 83 84 74 82 62 C90 57 89 44 80 40 C82 29 72 18 60 20 C54 13 38 13 30 20 Z"
+      fill="#F3D9C4" stroke="#2B2A28" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M28 30 Q34 26 40 30" stroke="#2B2A28" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M46 26 Q52 22 58 27" stroke="#2B2A28" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M20 46 Q26 43 31 47" stroke="#2B2A28" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M64 44 Q70 40 76 45" stroke="#2B2A28" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M33 62 Q40 66 47 62" stroke="#2B2A28" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M53 64 Q60 68 67 63" stroke="#2B2A28" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="37" cy="52" r="9" fill="#FFFFFF" stroke="#2B2A28" stroke-width="3"/>
+    <circle cx="63" cy="52" r="9" fill="#FFFFFF" stroke="#2B2A28" stroke-width="3"/>
+    <line x1="46" y1="52" x2="54" y2="52" stroke="#2B2A28" stroke-width="3"/>
+    <line x1="28" y1="49" x2="20" y2="46" stroke="#2B2A28" stroke-width="3" stroke-linecap="round"/>
+    <line x1="72" y1="49" x2="80" y2="46" stroke="#2B2A28" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="37" cy="52" r="3.6" fill="#2B2A28"/>
+    <circle cx="63" cy="52" r="3.6" fill="#2B2A28"/>
+    <path id="brainMouth" d="M45 68 Q50 72 55 68" stroke="#2B2A28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </svg>
+  <div class="bubble" id="mascotBubble">Hi! I'm Cortex. Let's review some vocab.</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ DATA ============ */
+var GROUP_NAMES = {
+  1: "Types of Maps & Geospatial Tech",
+  2: "Spatial Patterns & Concepts",
+  3: "Human–Environment & Movement",
+  4: "Nature/Society & Region"
+};
+
+var DATA = [
+  {g:1,t:"Map projection",d:"A way of representing the curved surface of the Earth on a flat map; always causes some distortion.",e:"The Mercator projection stretches the size of land near the poles."},
+  {g:1,t:"Reference maps",d:"Maps that show the location of places and geographic features, emphasizing absolute location.",e:"A road map showing highways and city names."},
+  {g:1,t:"Physical map",d:"A reference map showing natural landscape features.",e:"A map showing the Rocky Mountains and Mississippi River."},
+  {g:1,t:"Political map",d:"A reference map showing boundaries of political units like countries and states.",e:"A map of the 50 U.S. states with their borders."},
+  {g:1,t:"Thematic maps",d:"Maps that display the spatial pattern of a specific topic or data set.",e:"A map showing population density by country."},
+  {g:1,t:"Cartogram",d:"A thematic map that resizes areas based on a data variable instead of true land area.",e:"A map where countries are drawn larger or smaller based on population."},
+  {g:1,t:"Choropleth map",d:"A thematic map using colors/shading to show a variable across predefined areas.",e:"A map of U.S. states shaded darker for higher average income."},
+  {g:1,t:"Dot density map",d:"A thematic map using dots to show the presence and relative density of a feature.",e:"A map with one dot per 1,000 people showing where population is concentrated."},
+  {g:1,t:"Graduated symbols map",d:"A thematic map using differently sized symbols to represent different quantities at specific points.",e:"Larger circles placed over cities with larger populations."},
+  {g:1,t:"Mental map",d:"A person's internal, personal picture of a place based on their own experience and perception.",e:"The route you'd sketch from memory to get from your house to school."},
+  {g:1,t:"Cylindrical map",d:"A projection made by wrapping a cylinder around the globe; keeps direction accurate but distorts size near the poles.",e:"The Mercator projection."},
+  {g:1,t:"Conic map",d:"A projection made using a cone placed over the globe; most accurate for mid-latitude regions.",e:"Maps of the continental U.S. used for aviation and weather."},
+  {g:1,t:"Planar/Azimuthal map",d:"A projection made by touching a flat plane to the globe at one point; accurate distance/direction from that center point.",e:"A map centered on the North Pole used for polar flight paths."},
+  {g:1,t:"Oval map",d:"A projection shaped like an oval that balances shape and size distortion across the whole map.",e:"The Robinson projection, commonly used in classrooms."},
+  {g:1,t:"Isoline map",d:"A thematic map that uses lines connecting points of equal value.",e:"A weather map with isotherms connecting places of equal temperature."},
+  {g:1,t:"GIS (geographic information system)",d:"A computer system that captures, stores, and displays geographic data in layers for analysis.",e:"City planners overlaying flood-zone data with housing locations."},
+  {g:1,t:"Satellite navigation systems",d:"Networks of satellites that give location and time data to receivers on Earth.",e:"GPS in a phone's maps app giving turn-by-turn directions."},
+  {g:1,t:"Remote sensing",d:"Collecting data about Earth's surface from a distance, usually by satellite or aircraft.",e:"Satellite images used to track deforestation in the Amazon."},
+
+  {g:2,t:"Absolute distance",d:"The exact, measurable distance between two points.",e:"Orlando is about 235 miles from Miami."},
+  {g:2,t:"Relative distance",d:"Distance described by time, cost, or effort rather than a fixed unit.",e:"\"Miami is about a 4-hour drive from Orlando.\""},
+  {g:2,t:"Absolute direction",d:"Direction based on the four cardinal points: N, S, E, W.",e:"Canada is north of the United States."},
+  {g:2,t:"Relative direction",d:"Direction described in relation to a reference point rather than a cardinal direction.",e:"\"The store is behind the school.\""},
+  {g:2,t:"Elevation",d:"The height of a point on Earth's surface above sea level.",e:"Denver is nicknamed the \"Mile High City\" for its elevation."},
+  {g:2,t:"Distribution",d:"The arrangement of a feature across Earth's surface.",e:"The distribution of fast-food restaurants across a city."},
+  {g:2,t:"Clustering",d:"When features in a distribution are grouped closely together.",e:"Tech companies clustering in Silicon Valley."},
+  {g:2,t:"Dispersal",d:"When features in a distribution are spread far apart.",e:"Wheat farms spread across the rural Midwest."},
+  {g:2,t:"Density",d:"The frequency of a feature within a given area.",e:"New York City has a very high population density."},
+  {g:2,t:"Spatial pattern",d:"The geometric arrangement of objects in space.",e:"Houses arranged in a grid pattern in a suburb."},
+  {g:2,t:"Cultural landscape",d:"The visible imprint of human activity on the natural environment.",e:"Rice terraces carved into hillsides in rural Southeast Asia."},
+  {g:2,t:"Scale of analysis",d:"The level (local to global) at which geographic data is examined.",e:"Studying poverty at the neighborhood vs. national level."},
+  {g:2,t:"Absolute location",d:"The exact, fixed position of a place, usually given in coordinates.",e:"Orlando is located at about 28.5°N, 81.4°W."},
+  {g:2,t:"Relative location",d:"A place's position described in relation to other places.",e:"\"Orlando is about an hour from Tampa.\""},
+  {g:2,t:"Space (geography)",d:"The physical gap or distance between two objects or places.",e:"The open land between two neighboring towns."},
+  {g:2,t:"Place",d:"A specific point on Earth distinguished by particular physical and human characteristics.",e:"Paris is known for the Eiffel Tower and café culture."},
+  {g:2,t:"Sense of place",d:"The emotional attachment or identity people associate with a location.",e:"A hometown feeling like \"home\" because of shared memories."},
+  {g:2,t:"Placelessness",d:"The loss of a location's uniqueness due to standardized development.",e:"A strip mall with the same chain stores found in any city."},
+
+  {g:3,t:"Census",d:"An official count/survey of a population, including demographic details, usually done regularly.",e:"The U.S. Census Bureau counts the population every 10 years."},
+  {g:3,t:"Human-environment interaction",d:"The relationship between people and their surroundings — how humans adapt to, modify, and depend on the environment.",e:"Farmers irrigating dry land to grow crops."},
+  {g:3,t:"Distance decay",d:"The idea that interaction between two places decreases as the distance between them increases.",e:"People are more likely to shop at a store 2 miles away than one 20 miles away."},
+  {g:3,t:"Time-space compression",d:"The idea that improved transportation and communication technology makes places feel closer together.",e:"A video call making it feel like you're in the same room as someone overseas."},
+  {g:3,t:"Time-space convergence",d:"The decrease in travel time between two places over time because of technology.",e:"A trip that took weeks by ship now takes hours by plane."},
+  {g:3,t:"Movement (geography)",d:"One of the five themes of geography — the mobility of people, goods, ideas, and information across space.",e:"The migration of people from rural areas into cities."},
+  {g:3,t:"Sequent occupance",d:"The idea that successive societies each leave their own cultural imprint on the same place over time.",e:"A city built on the ruins of earlier civilizations, layering distinct architecture."},
+
+  {g:4,t:"Sustainability",d:"Using Earth's resources in ways that ensure they remain available for future generations.",e:"Recycling and renewable energy programs."},
+  {g:4,t:"Economic (sustainability)",d:"Sustainability that supports long-term economic viability.",e:"Renewable energy investment that creates jobs without depleting resources."},
+  {g:4,t:"Social (sustainability)",d:"Sustainability that meets community needs and promotes equity.",e:"Ensuring all community members have access to clean water."},
+  {g:4,t:"Environmental (sustainability)",d:"Sustainability that avoids long-term damage to ecosystems.",e:"Fishing quotas set to prevent overfishing."},
+  {g:4,t:"Environmental determinism",d:"The (now largely discredited) belief that the physical environment controls human behavior and cultural development.",e:"Older theories claiming climate alone determines how \"advanced\" a society becomes."},
+  {g:4,t:"Possiblism",d:"The theory that environment sets limits on human activity, but people can use technology and culture to adapt and overcome those limits.",e:"Building irrigation systems to farm successfully in a desert."},
+  {g:4,t:"Region",d:"An area unified by one or more shared physical or human characteristics.",e:"The \"Bible Belt\" in the southern United States."},
+  {g:4,t:"Regionalism",d:"Strong feelings of identity and loyalty to a specific region.",e:"Strong pride in Texas identity among Texans."},
+  {g:4,t:"Formal/uniform region",d:"A region defined by a shared characteristic that's consistent throughout, like language or climate.",e:"The Sahara Desert, defined by a shared dry climate."},
+  {g:4,t:"Functional/Nodal region",d:"A region organized around a central point or node, connected by a function.",e:"The delivery zone of a specific pizza shop."},
+  {g:4,t:"Perceptual/vernacular region",d:"A region defined by people's shared feelings or perception rather than exact boundaries.",e:"\"The South\" or \"the Midwest\" in the U.S."}
+];
+
+DATA.forEach(function(c,i){ c.id = "c"+i; });
+
+/* ============ LEVELS ============ */
+var LEVEL_NAMES = ["New","Learning","Reviewing","Mastered"];
+var LEVEL_COLORS = ["var(--lvl0)","var(--lvl1)","var(--lvl2)","var(--lvl3)"];
+var LEVEL_WEIGHTS = [4,3,2,1];
+
+/* ============ STATE / PERSISTENCE ============ */
+var STORAGE_KEY = "ahg_flashcards_v1";
+var progress = {}; // id -> {level, right, wrong}
+var totals = {reviewed:0, correct:0};
+
+function loadProgress(){
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      var parsed = JSON.parse(raw);
+      progress = parsed.progress || {};
+      totals = parsed.totals || {reviewed:0, correct:0};
+    }
+  }catch(e){}
+  DATA.forEach(function(c){
+    if(!progress[c.id]) progress[c.id] = {level:0, right:0, wrong:0};
+  });
+}
+function saveProgress(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({progress:progress, totals:totals}));
+  }catch(e){}
+}
+loadProgress();
+
+/* ============ MASCOT ============ */
+var PHRASES = {
+  right: [
+    "Nice! That one's sticking.","Yes! Locked in.","Correct — nailed it.","Boom. Got it.",
+    "That's right, brain cells activated.","Yep! Moving on up.","Correct! You're on a roll.",
+    "Nailed it. Next!","There it is — great recall.","Sharp! That's exactly right."
+  ],
+  wrong: [
+    "No worries, that one's tricky.","Not quite — we'll circle back to it.","Close, but not this time.",
+    "That one's sneaky. Try again soon.","Missed it — happens to the best of us.","Not this time, but you'll get it.",
+    "Tricky term! Let's review it again.","No stress, that's what practice is for.",
+    "That's a tough one — it'll click soon.","Not it, but you're learning it right now."
+  ],
+  levelUp: [
+    "Leveling up! This one's sinking in.","Nice progress on that word.","That term just moved up a level.",
+    "Getting stronger on that one.","You're mastering that word.","One step closer to mastering that term.",
+    "Good momentum on that one."
+  ],
+  mastered: [
+    "Mastered! That one's yours now.","Fully mastered — nice work.","That word is locked in for good.",
+    "Certified mastered. On to the next.","You officially know that one.","Mastered — that's the good stuff."
+  ],
+  dropBack: [
+    "That one slipped — let's rebuild it.","Back to basics on this term, no big deal.",
+    "We'll give that one extra reps.","That word needs a little more love.",
+    "Resetting that one — you'll get it next round.","No worries, that term just needs more practice."
+  ],
+  sessionStart: [
+    "Let's do this — new session incoming.","Ready when you are.","Time to review some terms!",
+    "Let's knock out a few cards.","New round — let's go."
+  ],
+  sessionEnd: [
+    "Session done! Nice work.","That's a wrap for this round.","Great session — check your stats!",
+    "Done for now — your brain thanks you.","Solid round. Take a breather."
+  ],
+  tips: [
+    "Try saying the definition out loud before flipping the card.",
+    "Short, frequent study sessions beat one long cram.",
+    "Focus on your Needs Work terms right before the test.",
+    "If a word keeps tripping you up, connect it to something familiar.",
+    "Mixing up the order helps it stick better than the same sequence every time.",
+    "Explaining a term to someone else is a great way to test if you really know it.",
+    "Don't skip the example sentences — context helps memory.",
+    "A few minutes daily beats one big session the night before.",
+    "Mistakes now mean you won't make them on the test — that's the point of this."
+  ]
+};
+var lastPhrase = {};
+function say(category){
+  var pool = PHRASES[category];
+  if(!pool) return;
+  var pick;
+  var tries = 0;
+  do{
+    pick = pool[Math.floor(Math.random()*pool.length)];
+    tries++;
+  }while(pick === lastPhrase[category] && tries < 8);
+  lastPhrase[category] = pick;
+  var bubble = document.getElementById("mascotBubble");
+  bubble.textContent = pick;
+  var svg = document.getElementById("brainSvg");
+  svg.classList.remove("excited");
+  if(category === "right" || category === "mastered" || category === "levelUp"){
+    void svg.offsetWidth;
+    svg.classList.add("excited");
+    document.getElementById("brainMouth").setAttribute("d","M43 67 Q50 76 57 67");
+    setTimeout(function(){ document.getElementById("brainMouth").setAttribute("d","M45 68 Q50 72 55 68"); }, 900);
+  }
+}
+
+/* ============ HELPERS ============ */
+function weightFor(card){
+  var p = progress[card.id];
+  return LEVEL_WEIGHTS[p.level];
+}
+function weightedSample(pool, n, weighted){
+  var items = pool.map(function(c){ return {c:c, w: weighted ? weightFor(c) : 1}; });
+  var out = [];
+  n = Math.min(n, items.length);
+  for(var i=0;i<n;i++){
+    var total = items.reduce(function(s,x){return s+x.w;},0);
+    var r = Math.random()*total, acc=0, idx=0;
+    for(var j=0;j<items.length;j++){ acc+=items[j].w; if(r<=acc){idx=j;break;} }
+    out.push(items[idx].c);
+    items.splice(idx,1);
+  }
+  return out;
+}
+var STOPWORDS = ["a","an","the","of","to","in","on","at","for","and","or","but","is","are","was","were",
+  "be","being","been","that","this","these","those","it","its","as","by","with","from","into","than",
+  "then","so","such","also","not","no","do","does","did","how","what","which","who","whose","their",
+  "they","them","he","she","his","her","you","your","we","our","us","i","have","has","had","will",
+  "would","can","could","about","across","between","within","over","under","up","out","if","because"];
+function stem(w){
+  w = w.toLowerCase();
+  if(w.length>5 && w.endsWith("ing")) w = w.slice(0,-3);
+  else if(w.length>4 && w.endsWith("es")) w = w.slice(0,-2);
+  else if(w.length>4 && w.endsWith("ed")) w = w.slice(0,-2);
+  else if(w.length>4 && w.endsWith("s")) w = w.slice(0,-1);
+  return w;
+}
+function extractKeywords(text){
+  var words = (text||"").toLowerCase().match(/[a-z']+/g) || [];
+  var out = [];
+  words.forEach(function(w){
+    if(w.length<3) return;
+    if(STOPWORDS.indexOf(w)!==-1) return;
+    out.push(w);
+  });
+  return out;
+}
+
+/* ============ APP STATE ============ */
+var view = "study";
+var currentGroup = "all";
+var weakFocus = true;
+var session = [];
+var sessionIdx = 0;
+var sessionStats = {right:0, wrong:0, leveledUp:[], mastered:[], droppedBack:[]};
+var flipped = false;
+var graded = false;
+var spokenAnswer = "";
+var listening = false;
+var recognition = null;
+
+function poolForGroup(g){
+  if(g === "all") return DATA.slice();
+  return DATA.filter(function(c){ return c.g === g; });
+}
+var SESSION_SIZE = 16;
+
+function startSession(pool, opts){
+  opts = opts || {};
+  session = weightedSample(pool, opts.size || Math.min(SESSION_SIZE, pool.length), opts.weighted !== undefined ? opts.weighted : weakFocus);
+  sessionIdx = 0;
+  sessionStats = {right:0, wrong:0, leveledUp:[], mastered:[], droppedBack:[]};
+  flipped = false; graded = false; spokenAnswer = "";
+  say("sessionStart");
+  render();
+}
+
+/* ============ RENDER: STUDY ============ */
+function levelDots(level){
+  var html = '<div class="lvl-dots">';
+  for(var i=0;i<4;i++){
+    html += '<span class="'+(i<=level?'filled':'')+'" style="--dotcolor:'+LEVEL_COLORS[level]+'"></span>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function highlightDefinition(def, spoken){
+  var defWords = extractKeywords(def);
+  var spokenStems = extractKeywords(spoken).map(stem);
+  var uniqueKeywords = [];
+  defWords.forEach(function(w){ if(uniqueKeywords.indexOf(w)===-1) uniqueKeywords.push(w); });
+  var matchedSet = {};
+  uniqueKeywords.forEach(function(w){
+    var s = stem(w);
+    var hit = spokenStems.some(function(sw){ return sw===s || (sw.length>=4 && s.length>=4 && (sw.indexOf(s)===0 || s.indexOf(sw)===0)); });
+    if(hit) matchedSet[w] = true;
+  });
+  var tokens = def.split(/([a-zA-Z']+)/);
+  var html = tokens.map(function(tok){
+    var lw = tok.toLowerCase();
+    if(/^[a-zA-Z']+$/.test(tok) && uniqueKeywords.indexOf(lw)!==-1){
+      if(matchedSet[lw]) return '<mark class="hit">'+tok+'</mark>';
+      return '<mark class="miss">'+tok+'</mark>';
+    }
+    return tok;
+  }).join("");
+  return html;
+}
+
+function renderStudy(){
+  var pool = poolForGroup(currentGroup);
+
+  var html = "";
+  html += '<div class="controls">';
+  html += '<select id="groupSelect">';
+  html += '<option value="all"'+(currentGroup==="all"?" selected":"")+'>All Terms</option>';
+  [1,2,3,4].forEach(function(g){
+    html += '<option value="'+g+'"'+(currentGroup===g?" selected":"")+'>Group '+g+': '+GROUP_NAMES[g]+'</option>';
+  });
+  html += '</select>';
+  html += '<div class="toggle'+(weakFocus?" on":"")+'" id="weakToggle"><input type="checkbox" id="weakCheckbox" '+(weakFocus?"checked":"")+'/> Prioritize weak terms</div>';
+  html += '</div>';
+
+  if(!session.length){
+    html += '<div class="summary-card"><h2>Ready to study?</h2><div class="summary-sub">'+pool.length+' term'+(pool.length===1?"":"s")+' in this set.</div><div class="summary-buttons"><button class="nav-row primary" id="beginBtn" style="background:var(--accent);color:#fff;border:none;border-radius:14px;padding:13px 26px;font-weight:700;font-size:15px;cursor:pointer;">Start Session</button></div></div>';
+    document.getElementById("main").innerHTML = html;
+    bindStudyControls();
+    document.getElementById("beginBtn").onclick = function(){ startSession(pool); };
+    return;
+  }
+
+  if(sessionIdx >= session.length){
+    var total = sessionStats.right + sessionStats.wrong;
+    var pct = total? Math.round(sessionStats.right/total*100) : 0;
+    html += '<div class="summary-card">';
+    html += '<h2>Session complete!</h2>';
+    html += '<div class="summary-stat">'+sessionStats.right+' / '+total+'</div>';
+    html += '<div class="summary-sub">'+pct+'% correct this round';
+    if(sessionStats.mastered.length) html += ' · '+sessionStats.mastered.length+' newly mastered';
+    if(sessionStats.droppedBack.length) html += ' · '+sessionStats.droppedBack.length+' need more reps';
+    html += '</div>';
+    html += '<div class="summary-buttons">';
+    html += '<button id="againBtn" style="background:var(--accent);color:#fff;border:none;border-radius:14px;padding:12px 20px;font-weight:700;font-size:14px;cursor:pointer;">Study Again</button>';
+    html += '<button id="overviewBtn" style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 20px;font-weight:700;font-size:14px;cursor:pointer;">See Overview</button>';
+    html += '</div></div>';
+    document.getElementById("main").innerHTML = html;
+    bindStudyControls();
+    document.getElementById("againBtn").onclick = function(){ startSession(pool); };
+    document.getElementById("overviewBtn").onclick = function(){ setView("overview"); };
+    say("sessionEnd");
+    return;
+  }
+
+  var card = session[sessionIdx];
+  var p = progress[card.id];
+  var pctDone = Math.round((sessionIdx)/session.length*100);
+
+  html += '<div class="session-bar"><span>Card '+(sessionIdx+1)+' of '+session.length+'</span><div class="track"><div class="fill" style="width:'+pctDone+'%"></div></div><span>'+sessionStats.right+' right</span></div>';
+
+  html += '<div class="stage"><div class="card'+(flipped?" flipped":"")+'" id="flipCard">';
+
+  html += '<div class="face front">';
+  html += '<div class="lvl-badge">'+levelDots(p.level)+'<span>'+LEVEL_NAMES[p.level]+'</span></div>';
+  html += '<div class="term-text">'+card.t+'</div>';
+  html += '<div class="flip-hint">Tap card to reveal definition</div>';
+  if(recognitionAvailable()){
+    html += '<div class="mic-row">';
+    html += '<button class="mic-btn'+(listening?" listening":"")+'" id="micBtn" type="button">'+(listening?"Listening…":"🎤 Say your answer")+'</button>';
+    if(spokenAnswer) html += '<div class="spoken-box"><b>You said:</b> '+spokenAnswer+'</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  html += '<div class="face back">';
+  html += '<div class="def-label">Definition</div>';
+  html += '<div class="def-text">'+(spokenAnswer ? highlightDefinition(card.d, spokenAnswer) : card.d)+'</div>';
+  html += '<div class="def-label" style="margin-top:6px;">Example</div>';
+  html += '<div class="ex-text">'+card.e+'</div>';
+  if(spokenAnswer){
+    html += '<div class="compare-note">Green = you said it. Underlined = you may have missed it. This is a study aid, not an auto-grade — you decide if you got it right.</div>';
+  }
+  html += '<div class="grade-row"><button class="btn-wrong" id="wrongBtn" '+(graded?"disabled":"")+'>Got it wrong</button><button class="btn-right" id="rightBtn" '+(graded?"disabled":"")+'>Got it right</button></div>';
+  html += '</div>';
+
+  html += '</div></div>';
+
+  html += '<div class="nav-row"><button id="nextBtn"'+(!graded?' disabled':'')+'>Next →</button></div>';
+
+  document.getElementById("main").innerHTML = html;
+  bindStudyControls();
+
+  document.getElementById("flipCard").onclick = function(e){
+    if(e.target.closest("#micBtn") || e.target.closest("#rightBtn") || e.target.closest("#wrongBtn")) return;
+    flipped = !flipped;
+    render();
+  };
+  if(document.getElementById("micBtn")){
+    document.getElementById("micBtn").onclick = function(e){ e.stopPropagation(); toggleListening(); };
+  }
+  if(document.getElementById("rightBtn")){
+    document.getElementById("rightBtn").onclick = function(e){ e.stopPropagation(); grade(true); };
+    document.getElementById("wrongBtn").onclick = function(e){ e.stopPropagation(); grade(false); };
+  }
+  if(document.getElementById("nextBtn")){
+    document.getElementById("nextBtn").onclick = function(){ nextCard(); };
+  }
+  bindSwipe(document.getElementById("flipCard"));
+}
+
+function bindSwipe(el){
+  if(!el) return;
+  var startX=0, startY=0, tracking=false;
+  el.addEventListener("touchstart", function(e){
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY; tracking=true;
+  }, {passive:true});
+  el.addEventListener("touchend", function(e){
+    if(!tracking) return;
+    tracking=false;
+    var dx = e.changedTouches[0].clientX - startX;
+    var dy = e.changedTouches[0].clientY - startY;
+    if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)*1.5 && graded){
+      nextCard();
+    }
+  }, {passive:true});
+}
+
+function bindStudyControls(){
+  var gs = document.getElementById("groupSelect");
+  if(gs){
+    gs.onchange = function(){
+      currentGroup = this.value === "all" ? "all" : parseInt(this.value,10);
+      session = []; sessionIdx = 0;
+      render();
+    };
+  }
+  var wt = document.getElementById("weakCheckbox");
+  if(wt){
+    wt.onchange = function(){
+      weakFocus = this.checked;
+      render();
+    };
+  }
+}
+
+function grade(correct){
+  var card = session[sessionIdx];
+  var p = progress[card.id];
+  var prevLevel = p.level;
+  totals.reviewed++;
+  if(correct){
+    totals.correct++;
+    p.right++;
+    p.level = Math.min(3, p.level+1);
+    sessionStats.right++;
+    if(p.level === 3 && prevLevel !== 3){
+      sessionStats.mastered.push(card.t);
+      say("mastered");
+    } else if(prevLevel === 0 && p.level === 1){
+      say("right");
+    } else if(p.level > prevLevel){
+      sessionStats.leveledUp.push(card.t);
+      say("levelUp");
+    } else {
+      say("right");
+    }
+  } else {
+    p.wrong++;
+    if(prevLevel > 0){ sessionStats.droppedBack.push(card.t); }
+    p.level = 0;
+    sessionStats.wrong++;
+    if(prevLevel > 0) say("dropBack"); else say("wrong");
+  }
+  saveProgress();
+  graded = true;
+  render();
+}
+
+function nextCard(){
+  sessionIdx++;
+  flipped = false;
+  graded = false;
+  spokenAnswer = "";
+  stopListening();
+  render();
+}
+
+/* ---- speech ---- */
+function recognitionAvailable(){
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+function toggleListening(){
+  if(listening){ stopListening(); return; }
+  var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!Ctor) return;
+  recognition = new Ctor();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = function(ev){
+    spokenAnswer = ev.results[0][0].transcript;
+    listening = false;
+    render();
+  };
+  recognition.onerror = function(){ listening = false; render(); };
+  recognition.onend = function(){ listening = false; render(); };
+  listening = true;
+  render();
+  try{ recognition.start(); }catch(e){ listening=false; render(); }
+}
+function stopListening(){
+  if(recognition){ try{ recognition.stop(); }catch(e){} }
+  listening = false;
+}
+
+/* ============ RENDER: OVERVIEW ============ */
+var overviewFilter = "all"; // all | weak | mastered
+
+function renderOverview(){
+  var counts = [0,0,0,0];
+  DATA.forEach(function(c){ counts[progress[c.id].level]++; });
+  var totalCards = DATA.length;
+  var pctReviewed = totals.reviewed ? Math.round(totals.correct/totals.reviewed*100) : 0;
+
+  var html = "";
+  html += '<div class="stat-strip">';
+  html += '<div class="nums"><span>'+totalCards+' terms total</span><span>'+totals.reviewed+' reviewed</span></div>';
+  html += '<div class="segbar">';
+  [0,1,2,3].forEach(function(i){
+    var w = totalCards? (counts[i]/totalCards*100) : 0;
+    if(w>0) html += '<div style="width:'+w+'%;background:'+LEVEL_COLORS[i]+';"></div>';
+  });
+  html += '</div>';
+  html += '<div class="legend">';
+  [0,1,2,3].forEach(function(i){
+    html += '<span><i style="background:'+LEVEL_COLORS[i]+'"></i>'+LEVEL_NAMES[i]+' ('+counts[i]+')</span>';
+  });
+  html += '</div>';
+  html += '<div class="overall-line">Overall accuracy: '+pctReviewed+'%'+(totals.reviewed?"":" — start studying to see this!")+'</div>';
+  html += '</div>';
+
+  html += '<div class="filter-row">';
+  html += '<button data-f="all" class="'+(overviewFilter==="all"?"active":"")+'">All</button>';
+  html += '<button data-f="weak" class="'+(overviewFilter==="weak"?"active":"")+'">Needs Work</button>';
+  html += '<button data-f="mastered" class="'+(overviewFilter==="mastered"?"active":"")+'">Mastered</button>';
+  html += '</div>';
+
+  var visible = DATA.filter(function(c){
+    var lvl = progress[c.id].level;
+    if(overviewFilter==="weak") return lvl<=1;
+    if(overviewFilter==="mastered") return lvl===3;
+    return true;
+  });
+
+  html += '<button class="study-these" id="studyTheseBtn">Study these ('+visible.length+' term'+(visible.length===1?"":"s")+')</button>';
+
+  [1,2,3,4].forEach(function(g){
+    var terms = visible.filter(function(c){ return c.g===g; });
+    if(!terms.length) return;
+    terms.sort(function(a,b){
+      var pa=progress[a.id], pb=progress[b.id];
+      if(pa.level!==pb.level) return pa.level-pb.level;
+      return pb.wrong - pa.wrong;
+    });
+    html += '<div class="group-heading">Group '+g+': '+GROUP_NAMES[g]+'</div>';
+    terms.forEach(function(c){
+      var p = progress[c.id];
+      html += '<div class="term-row" data-id="'+c.id+'">';
+      html += '<div class="row-head"><span class="name">'+c.t+'</span><span class="row-badge"><span class="dot" style="background:'+LEVEL_COLORS[p.level]+'"></span>'+LEVEL_NAMES[p.level]+'</span></div>';
+      html += '<div class="row-body"><div class="rdef">'+c.d+'</div><div>'+c.e+'</div></div>';
+      html += '</div>';
+    });
+  });
+
+  html += '<div class="reset-wrap"><button class="reset-btn" id="resetBtn">Reset all progress</button></div>';
+
+  document.getElementById("main").innerHTML = html;
+
+  document.querySelectorAll(".filter-row button").forEach(function(b){
+    b.onclick = function(){ overviewFilter = this.dataset.f; renderOverview(); };
+  });
+  document.getElementById("studyTheseBtn").onclick = function(){
+    if(!visible.length) return;
+    setView("study");
+    startSession(visible, {size: Math.min(SESSION_SIZE, visible.length), weighted:false});
+  };
+  document.querySelectorAll(".term-row .row-head").forEach(function(el){
+    el.onclick = function(){ el.closest(".term-row").classList.toggle("open"); };
+  });
+  document.getElementById("resetBtn").onclick = function(){
+    if(confirm("Reset all progress? This clears every card's level and stats.")){
+      progress = {};
+      totals = {reviewed:0, correct:0};
+      DATA.forEach(function(c){ progress[c.id] = {level:0, right:0, wrong:0}; });
+      saveProgress();
+      renderOverview();
+    }
+  };
+}
+
+/* ============ VIEW SWITCH / ROOT RENDER ============ */
+function setView(v){
+  view = v;
+  document.getElementById("tabStudy").classList.toggle("active", v==="study");
+  document.getElementById("tabOverview").classList.toggle("active", v==="overview");
+  render();
+}
+function render(){
+  if(view==="study") renderStudy();
+  else renderOverview();
+}
+
+document.getElementById("tabStudy").onclick = function(){ setView("study"); };
+document.getElementById("tabOverview").onclick = function(){ setView("overview"); };
+
+/* idle tips on overview */
+setInterval(function(){
+  if(view==="overview" && Math.random() < 0.5) say("tips");
+}, 25000);
+
+render();
+
+})();
+</script>
+</body>
+</html>
